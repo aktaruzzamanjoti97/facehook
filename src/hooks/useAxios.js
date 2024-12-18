@@ -8,7 +8,7 @@ const useAxios = () => {
 
     useEffect(() => {
         // Add a request interceptor
-        api.interceptors.request.use((config) => {
+        const requestIntercept = api.interceptors.request.use((config) => {
             const authToken = auth?.authToken
             if (authToken) {
                 config.headers.Authorization = `Bearer ${authToken}`
@@ -19,16 +19,17 @@ const useAxios = () => {
         );
 
         // Add a response interceptor
-        api.interceptors.response.use((response) => response, async (error) => {
+        const responseIntercept = api.interceptors.response.use((response) => response, async (error) => {
             const originalRequest = error.config
             if (error.response.status === 401 && !originalRequest._retry) {
                 originalRequest._retry = true
                 try {
-                    const refreshToken = auth.refreshToken
-                    const response = await api.post(`${import.meta.env.VITE_SERVER_BASE_URL}/auth/refresh-token`, { refreshToken });
+                    const refreshToken = auth?.refreshToken
+                    const response = await axios.post(`${import.meta.env.VITE_SERVER_BASE_URL}/auth/refresh-token`, { refreshToken });
                     const { token } = response.data
 
                     console.log(`New Token: ${token}`);
+                    setAuth({ ...auth, authToken: token })
 
                     originalRequest.headers.Authorization = `Bearer ${token}`
 
@@ -40,5 +41,13 @@ const useAxios = () => {
             }
             return Promise.reject(error)
         })
-    }, [])
+        return () => {
+            api.interceptors.request.eject(requestIntercept)
+            api.interceptors.response.eject(responseIntercept)
+        }
+    }, [auth.authToken])
+
+    return { api }
 }
+
+export default useAxios
